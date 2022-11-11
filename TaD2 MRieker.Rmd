@@ -1,0 +1,124 @@
+---
+title: "TaD Assignment 2"
+author: "Maren Rieker"
+date: "2022-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+library(manifestoR)
+mp_setapikey("manifesto_apikey.txt")
+library(tm)
+library(tidyverse)
+library(quanteda)
+library(topicmodels)
+library(tidytext)
+
+mpds <- data.frame(mp_maindataset(version = "MPDS2022a"))
+```
+
+## (1) Data acquisition, description and preparation
+
+# Data acquisition and description
+```{r}
+###########################################################GET THE ECHO OUT 
+#mp <- mp_corpus(party == c(41112, 41113, #greens
+#                           41221, 41222, 41223, #left
+#                           41320, #spd
+#                           41420, #fdp
+#                           41521, #union
+#                           41953) & date >= 199001) #afd
+#elegante version klappt noch nicht
+
+
+
+mpds_de <- mpds %>% 
+  filter(countryname == "Germany" 
+         & date >= 199001
+         & party != "41952" #taking the pirates out of the dataset
+         & party != "41912") #same for the ssw
+
+as.data.frame(mpds_de)
+
+mpc <- mp_corpus(mpds_de)
+mpc <- corpus(mpc)
+
+filter(mpds_de, party == 41320)
+filter(mpds_de, party == 41953)
+```
+
+The dataset I compiled contains all relevant parties on a national level in Germany since 1990. The year 1990 was chosen as there were the first federal elections since the reunification held. Most parties (The Left, Greens, SPD, Union, FDP and AfD) represented in the Bundestag since then have been included.
+
+The AfD is represented by the least amount of documents (3) - this is because the party was only founded in 2013 and participated in the federal elections the same year. While it is not optimal for this analysis on first sight that one of the main parties of interest is represented with the fewest documents, the AfD also emerged in a critical time for the discourse researched and therefore still covers the most important timeframe to answer the research question. For every other party in the dataset, nine documents each are available.
+
+# Preparing the data for topic modelling with a document feature matrix
+```{r}
+dfmat <- mpc %>%
+  tokens(remove_numbers = T, remove_punct = T) %>%
+  tokens_remove(pattern = stopwords("de")) %>%
+  dfm()
+dfmat
+```
+
+
+## (2) Research question: Does the modern cleavage of a conflict between populist-authorianism and liberal pluralism reflect in german party manifestos? / Which topics dominate the modern cleavage between populist-authorianism and liberal pluralism in party manifestos in Germany?
+
+The question I'm going to explore using topic modelling concerns cleavages in the modern party system of Germany. Generally, the cleavage theory was first formulated by Lipset and Rokkan in the 1960s, where they identifies four dimensions of cleavages where parties have historically emerged. Keeping dealignment processes in Western societies after World War 2 in mind, scholars now are speaking about a new cleavage emerging.
+......
+
+comments on data available:
+methods: sentiment analysis would probably come in very handy here to see differences in parties' view points
+if they are writing on these topics generally though and in which frequency shows that they have them on the agenda nonetheless
+
+
+## (3) Topic model development
+
+I choose Latent Dirichlet Allocation (LDA)
+```{r}
+try_lda <- LDA(dfmat, k = 7)
+try_lda
+```
+```{r}
+mani_topics <- tidy(try_lda, matrix = "beta")
+mani_topics
+```
+
+```{r}
+mp_top_terms <- mani_topics %>%
+  group_by(topic) %>%
+  slice_max(beta, n = 10) %>% 
+  ungroup() %>%
+  arrange(topic, -beta)
+
+mp_top_terms %>% 
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  scale_y_reordered()
+```
+
+```{r}
+
+```
+
+
+Explanation of what the model does:
+In LDA, the examined corpus is considered in two levels: First, every document is seen as a mixture of topics, while second, every topic consists of a mixture of words. The algorithm in LDA basically examines both levels at the same time and can therefore give insights into the proportion different topics have in the examined documents and of which words they consist.
+It is important to note that one word can belong to several topics - coming in handy for the examination of party manifestos, where one can expect for some words to be used by every party and across different topics.
+
+Hyperparameter selection & model choice:
+
+
+
+
+## (4) Topic model description
+
+
+
+
+
+## (5) Answering my research question
+
+
