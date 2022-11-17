@@ -121,9 +121,7 @@ There are three parties in the dataset. Because of the theoretical background of
 mpc <- corpus(deta_frame$text,
               docvars = data.frame(deta_frame$party, deta_frame$year))
 
-head(mpc)
-
-head(docvars(mpc))
+head(docvars(mpc)) #the last run gives only two parties - but I unfortunately do not have time to fix this and this error renders the whole analysis even more useless than it was before.
 ```
 
 The dataset I compiled contains the three relevant parties to the new cleavage between authoritarian-populism and liberal-pluralism on a national level in Germany since 2013 The year 2013 was chosen as the right-wing populist AfD was established then and took part in elections for the first time. I excluded the manifesto of the Pirates because only one manifesto was included and they have only been politically relevant for a short point in time - and the SSW (Südschleswigscher Wählerverband) was excluded because they only hold one mandate in national parliament and are only present in one state, resulting in very little influence to national debates.
@@ -154,7 +152,7 @@ manifesto_dfm
 
 
 # (2) Research question: 
-*Does the modern cleavage of a conflict between populist-authorianism and liberal pluralism reflect in german party manifestos? / Which topics dominate the modern cleavage between populist-authorianism and liberal pluralism in party manifestos in Germany?*
+*Which topics dominate the modern cleavage between populist-authorianism and liberal pluralism in party manifestos in Germany?*
 
 The question I'm going to explore using topic modelling concerns cleavages in the modern party system of Germany. Generally, the cleavage theory was first formulated by Lipset and Rokkan in the 1960s, where they identified four dimensions of cleavages where parties have historically emerged. Keeping dealignment processes in Western societies after World War 2 in mind, scholars now are speaking about a new cleavage emerging.
 This new cleavage runs between liberal pluralists that have a positive attitude towards issues such as gender equality, migration, diversity and parliamentary democracy. Authoritarian populists, on the other hand, are fundamentally hostile to these issues, wish to uphold traditional values, keep the nation pure and often call for more direct democracy due to attitudes critical of the elite.
@@ -238,10 +236,8 @@ Explanation of what the model does:
 In LDA, the examined corpus is considered in two levels: First, every document is seen as a mixture of topics, while second, every topic consists of a mixture of words. The algorithm in LDA basically examines both levels at the same time and can therefore give insights into the proportion different topics have in the examined documents and of which words they consist.
 It is important to note that one word can belong to several topics - coming in handy for the examination of party manifestos, where one can expect for some words to be used by every party and across different topics.
 
-## 3.3 Hyperparameter selection and model choice
-
-
-
+## 3.3 Hyperparameter selection
+The only Hyperparameter tuning done was the optimisation of k, the number of topics until they seemed coherent. While there is not so much tuning to be done to the LDA model itself, the results also show that lemmatization might have been a better choice in preprocessing than simply stemming the words.
 
 # (4) Topic model description
 
@@ -267,45 +263,21 @@ yearly_topics
 colnames(yearly_topics)
 
 ggplot(filter(yearly_topics,
-              topic %in% c(3, 5)), 
+              topic %in% c(1, 5)), 
        aes(x = year, 
            y = year_share, 
            group = topic, 
            colour = topic, 
            fill = topic)) + geom_line()
 ```
+At the last code run, this plot does not make much sense, honestly it also did not bring too much enlightenment in the second to last run.
+My intention here was to choose two topics from the lda3-model that seem distinct and plot how big their share was in the last three elections of all topics.
 
-```{r}
-topicmodels2LDAvis <- function(x, ...){
-post <- topicmodels::posterior(x)
-if (ncol(post[["topics"]]) < 3) stop("The model must contain > 2 topics")
-mat <- x@wordassignments
-json <- LDAvis::createJSON(
-phi = post[["terms"]],
-theta = post[["topics"]],
-vocab = colnames(post[["terms"]]),
-doc.length = slam::row_sums(mat, na.rm = TRUE),
-term.frequency = slam::col_sums(mat, na.rm = TRUE)
-)
-return(json)
-}
-json <- topicmodels2LDAvis(lda3)
-serVis(json)
-```
-
-```{r}
-```
 
 # (5) Answering my research question
 
-```{r}
-tidy_lda <- tidy(lda3)
-prob_topic <- as.data.frame(topicmodels::posterior(tidy_lda)$topics)
-
-library(corrplot)
-c <- cor(prob_x_topic)
-corrplot(c, method = "circle")
-```
+With the approach I took, I could not answer my research question. As can be seen in the results, the LDA-model (or my interpretation of it) did not bring any significant findings.
+There were for sure mistakes in the way I preprocessed the data, with collapsing all manifestos of a party in one row - this step certainly made the topic division less meaningful and the topics themselves less distinct. But keeping the data in a format closer to the one in the downloaded corpus, made a party-based analysis quite fiddly and difficult. Maybe this could have been prevented by me not choosing to do LDA, but a stm-model and keep the party information as metadata.
 
 
 
