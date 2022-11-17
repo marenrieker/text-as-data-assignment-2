@@ -5,9 +5,17 @@ date: "2022-11-11"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F)
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = TRUE,
+                      error = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      comment = NA)
+```
 
+Setup
+```{r, include = T}
 library(manifestoR)
 mp_setapikey("manifesto_apikey.txt")
 library(tm)
@@ -19,11 +27,12 @@ library(LDAvis)
 library(servr)
 ```
 
+
 # (1) Data acquisition, description and preparation
 
 ## 1.1 Data acquisition and description
 
-```{r, include = TRUE}
+```{r}
 #create a dataframe to access more information
 dfmpds <- data.frame(mp_maindataset(version = "MPDS2022a"))
 
@@ -35,14 +44,20 @@ mpds_de <- dfmpds %>%
 
 mpds_de <- dfmpds %>% 
   filter(countryname == "Germany" 
-         & date >= 199001
+         & date >= 201301
          & party != "41952" #taking the pirates out of the dataset
-         & party != "41912") #same for the ssw
+         & party != "41912" #same for the ssw
+         & party != "41320" #and spd
+         & party != "41521" #and cdu
+         & party != "41223") #and linke 
 
 mpds <- mp_corpus(countryname == "Germany"
-                  & date >= 199001
+                  & date >= 201301
                   & party != "41952"
-                  & party != "41912")
+                  & party != "41912"
+                  & party != "41320"
+                  & party != "41521"
+                  & party != "41223")
 
 #because my research question will focus on parties, the data needs to be adjusted
 deta_frame <- mpds %>% 
@@ -51,8 +66,7 @@ deta_frame <- mpds %>%
             cbind(mpds[[x]]$meta$party) %>%
             cbind(mpds[[x]]$meta$manifesto_id)) %>% 
   rename("party" = "mpds[[x]]$meta$party",
-         "manifesto_id" = "mpds[[x]]$meta$manifesto_id"
-         )
+         "manifesto_id" = "mpds[[x]]$meta$manifesto_id")
 
 deta_frame <- deta_frame %>% 
   mutate(year = str_extract(manifesto_id, "\\d{6}")) %>% 
@@ -60,18 +74,6 @@ deta_frame <- deta_frame %>%
   summarize(text = paste(text, collapse = " "))
 
 colnames(deta_frame)
-
-deta_frame <- within(deta_frame, {
-    f <- party == "41112"
-    party[f] <- "41113"
-}) #put the greens together
-
-deta_frame <- within(deta_frame, {
-    f <- party == "41221"  | party == "41222"
-    party[f] <- "41223"
-}) #put the left together
-
-deta_frame <- subset(deta_frame, select = -f)
 ```
 
 ## 1.2 Years, countries and parties in the data set and how many texts there are for each of these
@@ -80,42 +82,39 @@ Years
 ```{r}
 mpds_de %>% 
   distinct(date)
+
+mpyear <- table(mpds_de$date) %>% 
+  as.data.frame() %>% 
+  arrange(desc(Freq))
+mpyear
 ```
 
-There are nine elections in nine years in the data set, ranging from 1990 to 2021.
+There are three elections in three years in the data set, ranging from 2013 to 2021. In each election year, there are three manifestos.
 
 Countries
 ```{r}
 mpds_de %>% 
   distinct(countryname)
+
+mpcountry <- table(mpds_de$countryname) %>% 
+  as.data.frame() %>% 
+  arrange(desc(Freq))
+mpcountry
 ```
-I have included one country in the dataset, Germany.
+I have included one country in the dataset, Germany. Nine manifestos are included for Germany.
 
 Parties
 ```{r}
 mpds_de %>% 
   distinct(partyabbrev)
+
+mpparty <- table(mpds_de$partyabbrev) %>% 
+  as.data.frame() %>% 
+  arrange(desc(Freq))
+mpparty
 ```
 
-There are nine parties in the dataset, if I keep the original party coding and count the predecessor parties of today's. But because of the theoretical background of my research question, it does not make any sense to keep them separate, as I assume that parties only on the same side of the cleavage merge.
-Therefore, a change in parties:
-```{r}
-mpds_de <- within(mpds_de, {
-    f <- party == "41112"
-    party[f] <- "41113"
-    partyabbrev[f] <- "90/Greens"
-}) #put the greens together
-
-mpds_de <- within(mpds_de, {
-    f <- party == "41221"  | party == "41222"
-    party[f] <- "41223"
-    partyabbrev[f] <- "LINKE"
-}) #put the left together
-
-mpds_de %>% 
-  distinct(partyabbrev)
-```
-After harmonising the current parties with their predecessors, six parties are left in the dataset.
+There are three parties in the dataset. Because of the theoretical background of my research question, only these parties are included, as I assume that they represent both sides of the cleavage in Germany.
 
 ```{r}
 #create the corpus, including the relevant German parties since 1990
@@ -127,9 +126,7 @@ head(mpc)
 head(docvars(mpc))
 ```
 
-The dataset I compiled contains all relevant parties on a national level in Germany since 1990. The year 1990 was chosen as there were the first federal elections since the reunification held. Most parties (The Left, Greens, SPD, Union, FDP and AfD) represented in the Bundestag since then have been included. I excluded the manifestos of the Pirates because only one manifesto was included and they have only been politically relevant for a short point in time - and the SSW (Südschleswigscher Wählerverband) was excluded because they only hold one mandate in national parliament and are only present in one state, resulting in very little influence to national debates.
-
-The AfD is represented by the least amount of documents (3) - this is because the party was only founded in 2013 and participated in the federal elections the same year. While it is not optimal for this analysis on first sight that one of the main parties of interest is represented with the fewest documents, the AfD also emerged in a critical time for the discourse researched and therefore still covers the most important timeframe to answer the research question. For every other party in the dataset, nine documents each are available.
+The dataset I compiled contains the three relevant parties to the new cleavage between authoritarian-populism and liberal-pluralism on a national level in Germany since 2013 The year 2013 was chosen as the right-wing populist AfD was established then and took part in elections for the first time. I excluded the manifesto of the Pirates because only one manifesto was included and they have only been politically relevant for a short point in time - and the SSW (Südschleswigscher Wählerverband) was excluded because they only hold one mandate in national parliament and are only present in one state, resulting in very little influence to national debates.
 
 ## 1.3 Preparing the data for topic modelling with a document feature matrix
 
@@ -141,10 +138,9 @@ tokens_de <- mpc %>%
   tokens_tolower() %>%
   tokens_remove(stopwords("de")) %>% 
   tokens_wordstem(language = "de") %>% 
-  tokens_remove(c("muss", "dass", "deshalb", "sich", "dafur", "setz", "soll", "mehr", "stark", "programm"))
+  tokens_remove(c("muss", "dass", "deshalb", "sich", "dafur", "setz", "soll", "mehr", "stark", "programm", "deutschland"))
 
 tokens_de <- tokens_select(tokens_de, min_nchar = 4L) #excluding party names
-#tokens_de
 
 #document-feature-matrix
 token_dfm <- tokens_de %>% 
@@ -156,41 +152,36 @@ manifesto_dfm <- dfm_group(token_dfm,
 manifesto_dfm
 ```
 
-In the document-feature-matrix, first I exclude uncoded quasi-sentences and NA-values. Headlines are excluded, too, because I do not want the mentioning of words in them double their significance for the topic model. The use of the subset function for the cmp-codes is to select variables of interest to the research question. ######and it messes the matrix up, so we will see if this selection is allowed to stay#######
-In this case, I subset for topics derived from the literature - e.g. the party's opinion about the European Union or Immigration, which are typical topics of the new cleavage. The relevant codes are taken from the manifesto project's codebook (https://manifesto-project.wzb.eu/down/data/2022a/codebooks/codebook_MPDataset_MPDS2022a.pdf).
-Generally speaking, the new cleavage runs along cultural lines and is less economic in origin, so mainly variables referring to this have been included.
-
 
 # (2) Research question: 
 *Does the modern cleavage of a conflict between populist-authorianism and liberal pluralism reflect in german party manifestos? / Which topics dominate the modern cleavage between populist-authorianism and liberal pluralism in party manifestos in Germany?*
 
 The question I'm going to explore using topic modelling concerns cleavages in the modern party system of Germany. Generally, the cleavage theory was first formulated by Lipset and Rokkan in the 1960s, where they identified four dimensions of cleavages where parties have historically emerged. Keeping dealignment processes in Western societies after World War 2 in mind, scholars now are speaking about a new cleavage emerging.
-......
+This new cleavage runs between liberal pluralists that have a positive attitude towards issues such as gender equality, migration, diversity and parliamentary democracy. Authoritarian populists, on the other hand, are fundamentally hostile to these issues, wish to uphold traditional values, keep the nation pure and often call for more direct democracy due to attitudes critical of the elite.
 
-comments on data available: The Manifesto Project Database serves as a solid data foundation for my research question (and most questions concerned with party positions in general, I would say). They serve as a relatively neutral formulation of parties' plans and positions for a wide range of topics, while not being as polemised as for example Social Media updates or Talkshow appearances of single personalities within a party.
+The Manifesto Project Database serves as a solid data foundation for my research question (and most questions concerned with party positions in general, I would say). They serve as a relatively neutral formulation of parties' plans and positions for a wide range of topics, while not being as polemised as for example Social Media updates or Talkshow appearances of single personalities within a party.
 Moving on from the data source and having a closer look at the data I will actually feed my model, time will have to show whether I can make meaningful assumptions from the data to answer my research question. Constructing the document-feature-matrix was very painful and I am not sure if I got lost or actually managed to include all the information that I need to answer this question. The biggest challenge was whether the necessary information is in the end accessible to model party manifesto content by party.
-methods: sentiment analysis would probably come in very handy here to see differences in parties' view points
-if they are writing on these topics generally though and in which frequency shows that they have them on the agenda nonetheless - following the theory, parties from both sides of the cleavage have to be concerned with the same topics and just have different opinions on them
+Sentiment analysis would probably come in very handy here to see differences in parties' view points, but if they are writing on these topics generally though and in which frequency shows that they have them on the agenda nonetheless - following the theory, parties from both sides of the cleavage have to be concerned with the same topics and just have different opinions on them.
 
 
 # (3) Topic model development
 
 ## 3.1 Setting the model up
-I choose Latent Dirichlet Allocation (LDA) - with five topics at first
+I choose Latent Dirichlet Allocation (LDA) with three topics at first
 ```{r}
-lda1 <- LDA(manifesto_dfm, k = 5, control = list(seed = 1234))
+lda1 <- LDA(manifesto_dfm, k = 2, control = list(seed = 1234))
 lda1
 
-fivetopics <- tidy(lda1, matrix = "beta")
-fivetopics
+thtopics <- tidy(lda1, matrix = "beta")
+thtopics
 
-fivetopics_top_terms <- fivetopics %>%
+thtopics_top_terms <- thtopics %>%
   group_by(topic) %>%
   slice_max(beta, n = 10) %>% 
   ungroup() %>%
   arrange(topic, -beta)
 
-fivetopics_top_terms %>%
+thtopics_top_terms %>%
   mutate(term = reorder_within(term, beta, topic)) %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
@@ -220,13 +211,12 @@ tentopics_top_terms %>%
   scale_y_reordered()
 ```
 
-Now once more with 7:
+Now once more with 5:
 ```{r}
-lda3 <- LDA(manifesto_dfm, k = 6, control = list(seed = 1234))
+lda3 <- LDA(manifesto_dfm, k = 5, control = list(seed = 1234))
 lda3
 
 twtopics <- tidy(lda3, matrix = "beta")
-twtopics
 
 twtopics_top_terms <- twtopics %>%
   group_by(topic) %>%
@@ -277,7 +267,7 @@ yearly_topics
 colnames(yearly_topics)
 
 ggplot(filter(yearly_topics,
-              topic %in% c(5, 6)), 
+              topic %in% c(3, 5)), 
        aes(x = year, 
            y = year_share, 
            group = topic, 
@@ -303,8 +293,19 @@ json <- topicmodels2LDAvis(lda3)
 serVis(json)
 ```
 
-
+```{r}
+```
 
 # (5) Answering my research question
+
+```{r}
+tidy_lda <- tidy(lda3)
+prob_topic <- as.data.frame(topicmodels::posterior(tidy_lda)$topics)
+
+library(corrplot)
+c <- cor(prob_x_topic)
+corrplot(c, method = "circle")
+```
+
 
 
